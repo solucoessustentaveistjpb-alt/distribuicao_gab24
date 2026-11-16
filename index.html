@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Distribuição - Gabinete 24</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <!-- SheetJS (Excel/CSV Export and Import) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        main::-webkit-scrollbar-track { background: #f1f5f9; }
+        main::-webkit-scrollbar-thumb { background: #cbd5e1; }
+        main::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* Neon Effect for Rule 3/4 */
+        @keyframes neonPulse {
+            0% { text-shadow: 0 0 5px #22c55e, 0 0 10px #22c55e; opacity: 1; }
+            50% { text-shadow: 0 0 2px #22c55e, 0 0 5px #22c55e; opacity: 0.7; }
+            100% { text-shadow: 0 0 5px #22c55e, 0 0 10px #22c55e; opacity: 1; }
+        }
+        .neon-text {
+            color: #4ade80;
+            animation: neonPulse 1.5s infinite;
+            font-weight: 800;
+        }
+
+        /* Animated Toasts */
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast {
+            min-width: 280px; padding: 14px 20px; border-radius: 8px; font-weight: 600; font-size: 14px; color: white;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 12px;
+            animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .toast-success { background: #10B981; }
+        .toast-error { background: #EF4444; }
+        .toast-warning { background: #F59E0B; }
+        .toast-info { background: #3B82F6; }
+        
+        @keyframes slideIn { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeOut { from { transform: scale(1); opacity: 1; } to { transform: scale(0.95); opacity: 0; } }
+
+        /* Tabs */
+        .tab-active { border-bottom: 2px solid #2563eb; color: #2563eb; font-weight: 700; background: transparent; }
+        .tab-inactive { color: #64748b; font-weight: 600; background: transparent; }
+        .tab-inactive:hover { color: #334155; background: #f8fafc; }
+        
+        /* Modal Animation */
+        .modal-enter { opacity: 1 !important; }
+        .modal-enter-content { transform: scale(1) !important; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-slate-800 selection:bg-blue-200">
+
+    <aside class="w-[340px] bg-[#0f172a] text-slate-200 flex flex-col h-full flex-shrink-0 shadow-2xl z-20 border-r border-slate-800 overflow-hidden">
+        
+        <div class="p-6 border-b border-slate-800">
+            <div class="flex items-center gap-3 mb-3 text-blue-400">
+                <i data-lucide="scale" class="w-9 h-9"></i>
+                <div>
+                    <h1 class="font-bold text-[19px] leading-tight text-white tracking-tight">Painel de Distribuição</h1>
+                    <h2 class="text-xs font-semibold text-slate-400">Gab.24-Desa. Túlia Neves - TJ/PB</h2>
+                </div>
+            </div>
+            <p class="text-[10px] text-slate-500 mb-4 leading-relaxed">Sistema automatizado com regras 3/4 e exclusões.</p>
+            
+            <button onclick="toggleUserLevel()" class="w-full py-2.5 px-4 rounded-lg border border-purple-500/50 bg-purple-900/20 hover:bg-purple-900/40 text-purple-300 text-xs font-bold transition-colors flex flex-col items-center justify-center text-center leading-tight">
+                <span id="user-level-text">Nível Atual: Administrador (Clique para mudar)</span>
+            </button>
+        </div>
+
+        <div class="p-5 flex-1 overflow-y-auto">
+            <h3 class="text-xs uppercase tracking-wider font-bold text-slate-400 mb-4 flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4"></i> STATUS DOS ASSESSORES
+            </h3>
+            <div id="assessors-list" class="flex flex-col gap-3">
+                <!-- Renderizado via JS -->
+            </div>
+        </div>
+
+        <div class="p-4 border-t border-slate-800 bg-[#0B1120] flex flex-col gap-3">
+            <button onclick="openResetModal()" class="w-full flex items-center justify-center gap-2 text-xs font-bold text-slate-500 hover:text-rose-400 transition-colors p-2 rounded hover:bg-rose-900/20">
+                <i data-lucide="rotate-ccw" class="w-4 h-4"></i> ZERAR HISTÓRICO E FILAS
+            </button>
+            <div class="text-[10px] text-slate-600 text-center mt-2">
+                Idealizadores: Desa. Túlia, Robson M. e Cleberson S.
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-full overflow-hidden bg-slate-50 relative">
+        
+        <header class="bg-white border-b border-slate-200 px-8 py-6 z-10 shadow-sm">
+            <div class="flex flex-col xl:flex-row xl:items-end justify-between gap-6 max-w-7xl mx-auto">
+                
+                <div>
+                    <label class="block text-[11px] font-extrabold text-slate-500 uppercase tracking-wider mb-2">Data Base da Distribuição:</label>
+                    <div class="relative w-[220px]">
+                        <input type="date" id="base-date" class="w-full pl-4 pr-10 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow cursor-pointer shadow-sm" onchange="handleDateChange()">
+                        <i data-lucide="calendar" class="absolute right-3 top-2.5 w-5 h-5 text-blue-600 pointer-events-none"></i>
+                    </div>
+                </div>
+
+                <div class="flex flex-col items-end gap-2">
+                    <span class="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Ações de Dados e Sincronização:</span>
+                    
+                    <div class="flex flex-wrap items-center justify-end gap-2">
+                        <!-- Backup Local -->
+                        <button onclick="exportBackup()" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded shadow-sm transition-transform hover:-translate-y-0.5">
+                            <i data-lucide="save" class="w-4 h-4"></i> Salvar Backup (.gab24)
+                        </button>
+                        
+                        <!-- Importar (Mesclar) -->
+                        <div class="relative">
+                            <input type="file" id="import-backup" accept=".gab24, .json" onchange="importBackup(event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                            <button class="inline-flex items-center gap-2 px-4 py-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-xs font-bold rounded shadow-sm transition-transform hover:-translate-y-0.5 pointer-events-none">
+                                <i data-lucide="cloud-upload" class="w-4 h-4"></i> Importar / Mesclar
+                            </button>
+                        </div>
+                        
+                        <!-- Botão Centralizado de Exportação -->
+                        <button onclick="openExportModal()" class="admin-only inline-flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded shadow-sm transition-transform hover:-translate-y-0.5">
+                            <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Exportar Distribuídos por Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex-1 overflow-y-auto p-6 md:p-8">
+            <div class="max-w-7xl mx-auto space-y-8">
+
+                <section class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                    <div class="flex border-b border-slate-200">
+                        <button onclick="switchTab('single')" id="tab-single" class="px-6 py-3.5 text-sm tab-active flex items-center gap-2 transition-colors">
+                            <i data-lucide="file-text" class="w-4 h-4"></i> Processo Único
+                        </button>
+                        <button onclick="switchTab('batch')" id="tab-batch" class="px-6 py-3.5 text-sm tab-inactive flex items-center gap-2 transition-colors">
+                            <i data-lucide="layers" class="w-4 h-4"></i> Distribuição em Lote
+                        </button>
+                    </div>
+
+                    <div class="p-6 md:p-8">
+                        <div id="mode-single" class="block">
+                            <form onsubmit="executeSingleDistribution(event)" class="flex flex-col md:flex-row gap-5 items-end">
+                                <div class="flex-1 w-full">
+                                    <label class="block text-xs font-semibold text-slate-500 mb-2">Número do Processo</label>
+                                    <input type="text" id="single-process" placeholder="Ex: 0801234-56.2023.8.15.0000" class="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm" required>
+                                </div>
+                                <div class="flex-1 w-full">
+                                    <label class="block text-xs font-semibold text-slate-500 mb-2">Selecione a Fila / Competência</label>
+                                    <select id="single-queue" class="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none bg-white shadow-sm cursor-pointer"></select>
+                                </div>
+                                <button type="submit" class="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-10 rounded-lg shadow-md transition-colors">
+                                    Distribuir
+                                </button>
+                            </form>
+                        </div>
+
+                        <div id="mode-batch" class="hidden space-y-4">
+                            <div class="flex justify-between items-end mb-1">
+                                <label class="block text-xs font-semibold text-slate-500">Cole os Números (Um por linha)</label>
+                                <div class="relative">
+                                    <input type="file" accept=".csv, .xlsx, .xls" onchange="handleImportCSV(event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                                    <button type="button" class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 px-3 py-1.5 border border-emerald-200 rounded text-xs font-bold hover:bg-emerald-100 transition-colors pointer-events-none">
+                                        <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> Importar doc.csv (Coluna C)
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea id="batch-processes" rows="4" placeholder="0801234-56.2023.8.15.0000&#10;0809876-54.2023.8.15.0000" class="w-full p-4 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"></textarea>
+                            <div class="flex flex-col md:flex-row gap-5 items-end">
+                                <div class="flex-1 w-full">
+                                    <label class="block text-xs font-semibold text-slate-500 mb-2">Selecione a Fila / Competência para o Lote</label>
+                                    <select id="batch-queue" class="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none bg-white shadow-sm cursor-pointer"></select>
+                                </div>
+                                <button onclick="handleBatchDistribute()" class="w-full md:w-auto bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-10 rounded-lg shadow-md transition-colors">
+                                    Distribuir Lote
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section>
+                    <div class="flex items-center gap-3 mb-5">
+                        <i data-lucide="clock" class="text-blue-600 w-6 h-6"></i>
+                        <h2 class="text-xl font-bold text-slate-800">Painel de controle de Filas (Previsão)</h2>
+                        <span id="neon-34-alert" class="neon-text items-center gap-1.5 text-sm hidden px-3 py-1 bg-green-900/10 rounded-full border border-green-500/30"></span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5" id="forecast-cards"></div>
+                </section>
+
+                <div class="flex flex-col xl:flex-row gap-8">
+                    
+                    <section class="w-full xl:w-1/3 bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col">
+                        <h3 class="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <i data-lucide="bar-chart-2" class="text-blue-600 w-4 h-4"></i> Volume Atual
+                        </h3>
+                        <div class="relative w-full flex-1 min-h-[400px]">
+                            <canvas id="reportChart"></canvas>
+                        </div>
+                    </section>
+
+                    <section class="w-full xl:w-2/3 flex flex-col">
+                        <div class="flex flex-col lg:flex-row lg:items-end justify-between mb-4 gap-4">
+                            <div class="flex flex-col gap-1">
+                                <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                    <i data-lucide="history" class="text-blue-600 w-5 h-5"></i> Histórico de Distribuição
+                                </h2>
+                                <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200 self-start">
+                                    <i data-lucide="sigma" class="w-3.5 h-3.5"></i> <span id="total-count-badge">TOTAL: 0</span>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 shadow-sm">
+                                <div class="relative min-w-[200px] flex-1">
+                                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+                                    <input type="text" id="search-input" oninput="applyFilters()" placeholder="Buscar processo..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded text-sm outline-none focus:ring-1 focus:ring-blue-500">
+                                </div>
+                                <select id="filter-day" onchange="applyFilters()" class="border border-slate-300 rounded p-2 text-sm bg-slate-50 outline-none"><option value="">Dia</option></select>
+                                <select id="filter-month" onchange="applyFilters()" class="border border-slate-300 rounded p-2 text-sm bg-slate-50 outline-none">
+                                    <option value="">Mês</option><option value="01">Jan</option><option value="02">Fev</option><option value="03">Mar</option><option value="04">Abr</option><option value="05">Mai</option><option value="06">Jun</option><option value="07">Jul</option><option value="08">Ago</option><option value="09">Set</option><option value="10">Out</option><option value="11">Nov</option><option value="12">Dez</option>
+                                </select>
+                                <select id="filter-year" onchange="applyFilters()" class="border border-slate-300 rounded p-2 text-sm bg-slate-50 outline-none"><option value="">Ano</option></select>
+                                <button onclick="clearFilters()" class="p-2 text-slate-400 hover:text-slate-600 transition-colors" title="Limpar Filtros"><i data-lucide="x" class="w-4 h-4"></i></button>
+                            </div>
+                        </div>
+
+                        <div class="bg-white border border-slate-200 rounded-xl shadow-sm flex flex-col overflow-hidden flex-1">
+                            <div id="history-tabs" class="flex flex-wrap border-b border-slate-100 bg-slate-50 p-2 gap-2">
+                                <!-- Renderizado via JS -->
+                            </div>
+                            
+                            <div class="overflow-x-auto max-h-[450px]">
+                                <table class="w-full text-left text-sm text-slate-600">
+                                    <thead class="bg-white text-[11px] uppercase font-bold text-slate-400 sticky top-0 border-b border-slate-200 z-10 shadow-sm">
+                                        <tr>
+                                            <th class="px-5 py-4">Data / Hora</th>
+                                            <th class="px-5 py-4">Processo (PJe)</th>
+                                            <th class="px-5 py-4">Fila</th>
+                                            <th class="px-5 py-4 text-center">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="history-tbody" class="divide-y divide-slate-100">
+                                        <!-- Renderizado via JS -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal de Detalhes do Assessor (Novo) -->
+    <div id="assessor-details-modal" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4 opacity-0 transition-opacity duration-200" onclick="handleModalBackdropClick(event)">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-full md:max-w-[90%] lg:max-w-[80%] h-[85vh] flex flex-col overflow-hidden border border-slate-200 transform scale-95 transition-transform duration-200" id="assessor-modal-content">
+            
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 shadow-sm z-10">
+                <div class="flex items-center gap-4">
+                    <div class="bg-blue-100 p-3 rounded-lg text-blue-600">
+                        <i data-lucide="briefcase" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 tracking-tight" id="modal-assessor-title">Processos de Assessor</h2>
+                        <p class="text-xs font-semibold text-slate-500 mt-0.5" id="modal-assessor-subtitle">Total: 0 processos vinculados</p>
+                    </div>
+                </div>
+                <button onclick="closeAssessorModal()" class="text-slate-400 hover:text-rose-600 bg-white hover:bg-rose-50 border border-slate-200 rounded-full p-2.5 transition-colors shadow-sm">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Metrics -->
+            <div class="px-6 py-4 grid grid-cols-3 gap-4 border-b border-slate-100 bg-white">
+                <div class="bg-slate-50 rounded-lg p-3 border border-slate-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] uppercase font-bold text-slate-500">Total Geral</p>
+                        <p class="text-xl font-black text-slate-800" id="modal-metric-total">0</p>
+                    </div>
+                    <i data-lucide="layers" class="text-slate-300 w-8 h-8"></i>
+                </div>
+                <div class="bg-amber-50 rounded-lg p-3 border border-amber-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] uppercase font-bold text-amber-600">Pendentes (Hoje)</p>
+                        <p class="text-xl font-black text-amber-700" id="modal-metric-pending">0</p>
+                    </div>
+                    <i data-lucide="clock" class="text-amber-300 w-8 h-8"></i>
+                </div>
+                <div class="bg-blue-50 rounded-lg p-3 border border-blue-200 flex items-center justify-between">
+                    <div>
+                        <p class="text-[10px] uppercase font-bold text-blue-600">Em Andamento (Antigos)</p>
+                        <p class="text-xl font-black text-blue-700" id="modal-metric-progress">0</p>
+                    </div>
+                    <i data-lucide="activity" class="text-blue-300 w-8 h-8"></i>
+                </div>
+            </div>
+            
+            <!-- Modal Filters -->
+            <div class="px-6 py-3 bg-slate-50 flex gap-3 items-center border-b border-slate-200">
+                <div class="relative flex-1 max-w-sm">
+                    <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+                    <input type="text" id="modal-search" oninput="renderModalTable()" placeholder="Buscar por número..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500 shadow-sm">
+                </div>
+                <select id="modal-filter-status" onchange="renderModalTable()" class="px-3 py-2 bg-white border border-slate-300 rounded-md text-sm outline-none shadow-sm cursor-pointer text-slate-600">
+                    <option value="all">Todos os Status</option>
+                    <option value="Pendente">🟡 Pendente (Hoje)</option>
+                    <option value="Em Andamento">🔵 Em Andamento (Antigos)</option>
+                </select>
+            </div>
+            
+            <!-- Modal Table -->
+            <div class="flex-1 overflow-y-auto bg-white p-0 relative">
+                <!-- Loading Spinner -->
+                <div id="modal-loading" class="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-20 hidden">
+                    <i data-lucide="loader-2" class="w-8 h-8 text-blue-600 animate-spin mb-2"></i>
+                    <span class="text-sm font-bold text-slate-600">Carregando cache...</span>
+                </div>
+                
+                <table class="w-full text-left text-sm text-slate-600">
+                    <thead class="bg-white text-[11px] uppercase font-bold text-slate-400 sticky top-0 border-b border-slate-200 z-10 shadow-sm">
+                        <tr>
+                            <th class="px-5 py-3 w-[20%]">Número do Processo</th>
+                            <th class="px-5 py-3 w-[12%]">Data Distr.</th>
+                            <th class="px-5 py-3 w-[15%]">Classe / Assunto</th>
+                            <th class="px-5 py-3 w-[15%]">Fila / Vara</th>
+                            <th class="px-5 py-3 w-[12%]">Status</th>
+                            <th class="px-5 py-3 w-[16%] text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modal-tbody" class="divide-y divide-slate-100">
+                        <!-- Renderizado via JS -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="px-6 py-3 border-t border-slate-200 bg-slate-50 flex justify-between items-center text-xs">
+                <span class="text-slate-500 font-semibold flex items-center gap-1.5"><i data-lucide="database" class="w-3.5 h-3.5"></i> <span id="modal-last-updated">Última atualização: --</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Duplicados -->
+    <div id="duplicate-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 border border-slate-100">
+            <div class="flex items-center gap-3 text-amber-600 mb-4">
+                <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+                <h2 class="text-lg font-bold">Atenção: Processos Duplicados!</h2>
+            </div>
+            <p class="text-sm text-slate-600 mb-4">O sistema detectou processos no seu lote que já constam no histórico.</p>
+            <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 max-h-32 overflow-y-auto mb-6 text-xs font-mono text-amber-800">
+                <ul id="duplicate-list" class="list-disc pl-5 space-y-1"></ul>
+            </div>
+            <div class="flex flex-wrap gap-3 justify-end">
+                <button onclick="closeModal('duplicate-modal')" class="px-4 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 text-sm">Cancelar Lote</button>
+                <button onclick="confirmBatchNewOnly()" class="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 text-sm">Distribuir APENAS Novos</button>
+                <button onclick="confirmBatchAll()" class="px-4 py-2 bg-rose-600 text-white font-bold rounded-lg hover:bg-rose-700 text-sm">Ignorar e Distribuir TODOS</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal VIP/Exclusão -->
+    <div id="vip-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border border-slate-100">
+            <h2 class="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                <i data-lucide="settings-2" class="text-blue-600"></i> Ajuste de Distribuição
+            </h2>
+            <p class="text-sm text-slate-500 mb-6">Qual o motivo da remoção deste processo do histórico?</p>
+            <div class="space-y-3">
+                <button onclick="confirmDelete(false)" class="w-full flex items-center gap-4 p-4 border border-slate-200 rounded-lg hover:bg-slate-50 text-left group transition-colors">
+                    <div class="bg-slate-100 p-2 rounded-full group-hover:bg-slate-200"><i data-lucide="eraser" class="text-slate-600"></i></div>
+                    <div>
+                        <div class="font-bold text-slate-700 text-sm">1. Erro de Lançamento</div>
+                        <div class="text-xs text-slate-500">Apenas apaga o registro. A fila segue normal.</div>
+                    </div>
+                </button>
+                <button onclick="confirmDelete(true)" class="w-full flex items-center gap-4 p-4 border border-purple-200 rounded-lg hover:bg-purple-50 text-left group transition-colors">
+                    <div class="bg-purple-100 p-2 rounded-full group-hover:bg-purple-200"><i data-lucide="scale" class="text-purple-600"></i></div>
+                    <div>
+                        <div class="font-bold text-purple-700 text-sm">2. Impedimento / Decisão</div>
+                        <div class="text-xs text-slate-500">Apaga e cria COMPENSAÇÃO (VIP) para o assessor.</div>
+                    </div>
+                </button>
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button onclick="closeModal('vip-modal')" class="px-4 py-2 text-slate-500 hover:text-slate-700 font-bold text-sm">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Retificação -->
+    <div id="rectify-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border border-slate-100">
+            <h2 class="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                <i data-lucide="arrow-left-right" class="text-blue-600"></i> Retificar Distribuição
+            </h2>
+            <p class="text-sm text-slate-500 mb-4">Transferir o processo <strong id="rectify-process" class="text-slate-700 font-mono"></strong> para outro assessor.</p>
+            
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-3 mb-5">
+                <p class="text-xs text-purple-800 font-semibold flex items-start gap-2">
+                    <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5"></i>
+                    O assessor <span id="rectify-old-assessor" class="font-bold underline"></span> perderá este processo e receberá automaticamente uma compensação (Fila VIP) na respectiva competência.
+                </p>
+            </div>
+
+            <div class="mb-5">
+                <label class="block text-xs font-semibold text-slate-500 mb-2">Novo Assessor Responsável</label>
+                <select id="rectify-new-assessor" class="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-blue-500 outline-none bg-white shadow-sm cursor-pointer"></select>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="closeModal('rectify-modal')" class="px-4 py-2 text-slate-500 hover:text-slate-700 font-bold text-sm transition-colors">Cancelar</button>
+                <button onclick="confirmRectify()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm transition-colors shadow-sm">Confirmar e Compensar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal ZERAR TUDO -->
+    <div id="reset-modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center border border-rose-200">
+            <div class="w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-4 text-rose-600">
+                <i data-lucide="alert-triangle" class="w-8 h-8"></i>
+            </div>
+            <h2 class="text-xl font-black text-slate-800 mb-2">Atenção Extrema</h2>
+            <p class="text-sm text-slate-500 mb-6">Esta ação apagará todo o histórico visível e zerará as regras de 3/4 de todos os assessores.</p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="closeModal('reset-modal')" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-sm transition-colors">Cancelar</button>
+                <button onclick="confirmResetAction()" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-sm transition-colors">Sim, Zerar Tudo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Exportação Avançada -->
+    <div id="export-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 border border-slate-100">
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="file-spreadsheet" class="text-emerald-600"></i> Exportação Avançada
+                </h2>
+                <button onclick="closeModal('export-modal')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <div class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Data Inicial</label>
+                        <input type="date" id="export-start-date" class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1">Data Final</label>
+                        <input type="date" id="export-end-date" class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1">Filtrar Assessores</label>
+                    <select id="export-assessors" multiple class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm outline-none focus:border-emerald-500 h-32" title="Segure CTRL para selecionar múltiplos">
+                        <!-- Preenchido no JS -->
+                    </select>
+                    <p class="text-[10px] text-slate-400 mt-1">* Segure CTRL (ou CMD) para múltipla seleção.</p>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button onclick="closeModal('export-modal')" class="px-4 py-2 text-slate-500 hover:text-slate-700 font-bold text-sm">Cancelar</button>
+                <button onclick="executeAdvancedExport()" id="btn-export-confirm" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-sm flex items-center gap-2 transition-colors">
+                    <i data-lucide="download" class="w-4 h-4"></i> Gerar CSV
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container Toasts -->
+    <div id="toast-container"></div>
+
+    <script>
+        const initialAssessors = [
+            { id: 'ADL', prefix: 'GAB 01', name: 'Antônio', fullName: 'Antônio (ADL)', active: true, rule: 'normal', skipLiminar: false, skipSecao: false, skipOrgao: false },
+            { id: 'AWB', prefix: 'GAB 02', name: 'Waldir', fullName: 'Waldir (AWB)', active: true, rule: '3/4', skipLiminar: false, skipSecao: false, skipOrgao: false },
+            { id: 'AAP', prefix: 'GAB 03', name: 'Altamir', fullName: 'Altamir (AAP)', active: true, rule: '3/4', skipLiminar: false, skipSecao: false, skipOrgao: false },
+            { id: 'CAS', prefix: 'GAB 04', name: 'Cleberson', fullName: 'Cleberson (CAS)', active: true, rule: 'normal', skipLiminar: true, skipSecao: true, skipOrgao: true }, 
+            { id: 'GAC', prefix: 'GAB 05', name: 'George', fullName: 'George (GAC)', active: true, rule: 'normal', skipLiminar: false, skipSecao: false, skipOrgao: false },
+            { id: 'JJR', prefix: 'GAB 06', name: 'Júnior', fullName: 'Júnior (JJR)', active: true, rule: 'normal', skipLiminar: false, skipSecao: false, skipOrgao: false },
+            { id: 'MFP', prefix: 'GAB 07', name: 'Marcelo', fullName: 'Marcelo (MFP)', active: true, rule: 'normal', skipLiminar: false, skipSecao: false, skipOrgao: false },
+            { id: 'RAF', prefix: 'GAB 08', name: 'Robson', fullName: 'Robson (RAF)', active: true, rule: '3/4', skipLiminar: false, skipSecao: false, skipOrgao: false },
+            { id: 'RLC', prefix: 'GAB 09', name: 'Rodrigo', fullName: 'Rodrigo (RLC)', active: true, rule: 'normal', skipLiminar: false, skipSecao: false, skipOrgao: false },
+        ];
+
+        const initialQueues = [
+            { id: 'camara', name: '3ª Câmara Cível Especializada', currentIndex: 0, cycleCounts: {}, vip: [] },
+            { id: 'liminar', name: 'Liminar', currentIndex: 0, cycleCounts: {}, vip: [] },
+            { id: 'secao', name: 'Seção Especializada Cível', currentIndex: 0, cycleCounts: {}, vip: [] },
+            { id: 'orgao', name: 'Órgão Especial ou Pleno', currentIndex: 0, cycleCounts: {}, vip: [] }
+        ];
+
+        let assessors = JSON.parse(JSON.stringify(initialAssessors));
+        let queues = JSON.parse(JSON.stringify(initialQueues));
+        let distHistory = [];
+        
+        let pendingBatchList = [];
+        let pendingDeleteId = null; 
+        let currentTabFilter = 'all';
+        let currentUserLevel = 'admin';
+        
+        let currentModalAssessorId = null; // Para o Modal de Detalhes
+
+        window.onload = function() {
+            if (typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
+            lucide.createIcons();
+            populateDateFilters();
+            document.getElementById('base-date').value = new Date().toISOString().split('T')[0];
+            loadData();
+            populateSelects();
+            renderAll();
+            
+            // Listeners for Modal
+            document.addEventListener('keydown', (e) => {
+                if(e.key === 'Escape') closeAssessorModal();
+            });
+        };
+
+        function showToast(msg, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            let icon = type === 'success' ? 'check-circle' : type === 'error' ? 'x-circle' : type === 'warning' ? 'alert-triangle' : 'info';
+            toast.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5"></i> <span>${msg}</span>`;
+            container.appendChild(toast);
+            lucide.createIcons({root: toast});
+            setTimeout(() => {
+                toast.style.animation = 'fadeOut 0.3s ease forwards';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function saveData(silent = false) {
+            localStorage.setItem('gab24_dist_v4', JSON.stringify({ assessors, queues, history: distHistory }));
+            if(silent === true) showToast('Dados salvos no cache do navegador!', 'success');
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('gab24_dist_v4');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    if(parsed.assessors) assessors = parsed.assessors;
+                    if(parsed.queues) queues = parsed.queues;
+                    if(parsed.history) distHistory = parsed.history;
+                } catch(e) { console.error(e); }
+            }
+        }
+
+        function getBaseDateISO() {
+            const baseInput = document.getElementById('base-date').value;
+            if(!baseInput) return new Date().toISOString();
+            const now = new Date();
+            return new Date(`${baseInput}T${now.toTimeString().split(' ')[0]}`).toISOString();
+        }
+
+        function handleDateChange() {
+            const val = document.getElementById('base-date').value;
+            if(val) showToast(`Data Base alterada para: ${val.split('-').reverse().join('/')}`, 'info');
+        }
+
+        function populateSelects() {
+            const single = document.getElementById('single-queue');
+            const batch = document.getElementById('batch-queue');
+            const tabs = document.getElementById('history-tabs');
+            let html = '';
+            let tabsHtml = `<button onclick="filterByQueue('all', this)" class="hist-tab px-4 py-1.5 text-xs font-bold rounded-md bg-blue-100 text-blue-700 shadow-sm border border-blue-200">Todas</button>`;
+            
+            queues.forEach(q => {
+                html += `<option value="${q.id}">${q.name}</option>`;
+                tabsHtml += `<button onclick="filterByQueue('${q.id}', this)" class="hist-tab px-4 py-1.5 text-xs font-bold rounded-md text-slate-600 hover:bg-slate-200 transition-colors">${q.name}</button>`;
+            });
+            single.innerHTML = html;
+            batch.innerHTML = html;
+            tabs.innerHTML = tabsHtml;
+        }
+
+        function switchTab(mode) {
+            document.getElementById('mode-single').classList.toggle('hidden', mode !== 'single');
+            document.getElementById('mode-batch').classList.toggle('hidden', mode !== 'batch');
+            document.getElementById('tab-single').className = mode === 'single' ? "px-6 py-3.5 text-sm tab-active flex items-center gap-2 transition-colors" : "px-6 py-3.5 text-sm tab-inactive flex items-center gap-2 transition-colors";
+            document.getElementById('tab-batch').className = mode === 'batch' ? "px-6 py-3.5 text-sm tab-active flex items-center gap-2 transition-colors" : "px-6 py-3.5 text-sm tab-inactive flex items-center gap-2 transition-colors";
+        }
+
+        async function exportBackup() {
+            const baseDate = document.getElementById('base-date').value || new Date().toISOString().split('T')[0];
+            const filteredHistory = distHistory.filter(h => h.date.startsWith(baseDate));
+            
+            const dataToExport = {
+                version: "4.0",
+                exportDate: new Date().toISOString(),
+                baseDate: baseDate,
+                assessors,
+                queues,
+                history: filteredHistory 
+            };
+            const jsonStr = JSON.stringify(dataToExport, null, 2);
+            const blob = new Blob([jsonStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Backup_Gab24_${baseDate}.gab24`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast(`Backup do dia ${baseDate.split('-').reverse().join('/')} gerado!`, 'success');
+        }
+
+        function importBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if(parsed.history && Array.isArray(parsed.history)) {
+                        let added = 0;
+                        parsed.history.forEach(importedItem => {
+                            if(!distHistory.some(existing => existing.id === importedItem.id)) {
+                                distHistory.push(importedItem);
+                                added++;
+                            }
+                        });
+                        distHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+                        if(parsed.assessors) assessors = parsed.assessors;
+                        if(parsed.queues) queues = parsed.queues;
+                        saveData(); renderAll();
+                        showToast(`${added} registros importados e mesclados!`, 'success');
+                    }
+                } catch(error) { showToast('Erro ao ler o arquivo de backup.', 'error'); }
+                event.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function openExportModal() {
+            if (currentUserLevel !== 'admin') {
+                showToast('Apenas administradores podem exportar dados.', 'error');
+                return;
+            }
+            const today = new Date();
+            const lastWeek = new Date(today);
+            lastWeek.setDate(today.getDate() - 7);
+            
+            document.getElementById('export-start-date').value = lastWeek.toISOString().split('T')[0];
+            document.getElementById('export-end-date').value = today.toISOString().split('T')[0];
+            
+            const select = document.getElementById('export-assessors');
+            select.innerHTML = assessors.map(a => `<option value="${a.id}" selected>${a.prefix} - ${a.name}</option>`).join('');
+            
+            document.getElementById('export-modal').classList.remove('hidden');
+        }
+
+        async function executeAdvancedExport() {
+            const btn = document.getElementById('btn-export-confirm');
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Gerando...`;
+            btn.disabled = true;
+
+            try {
+                const startStr = document.getElementById('export-start-date').value;
+                const endStr = document.getElementById('export-end-date').value;
+                const opts = Array.from(document.getElementById('export-assessors').selectedOptions).map(o => o.value);
+
+                if (!startStr || !endStr) throw new Error("Datas inválidas.");
+                const start = new Date(startStr + "T00:00:00");
+                const end = new Date(endStr + "T23:59:59");
+                if (start > end) throw new Error("A data inicial não pode ser maior que a final.");
+                if (opts.length === 0) throw new Error("Selecione pelo menos um assessor.");
+
+                const filtered = distHistory.filter(i => {
+                    const d = new Date(i.date);
+                    return d >= start && d <= end && opts.includes(i.assessorId);
+                });
+
+                if (filtered.length === 0) throw new Error("Nenhum processo neste período.");
+                if (filtered.length > 10000) throw new Error("Limite de 10.000 registros excedido.");
+
+                await new Promise(r => setTimeout(r, 600));
+
+                const headers = ["Número do Processo", "Assessor", "Data", "Classe", "Assunto", "Status", "Sigilo", "Vara", "Data de Cadastro"];
+                const rows = [headers.join(";")];
+                
+                filtered.forEach(item => {
+                    const d = new Date(item.date);
+                    const fDate = d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+                    // Mockando dados ausentes com padrão
+                    rows.push([ `="${item.processNumber}"`, `"${item.assessorName}"`, `"${fDate}"`, `"N/I"`, `"N/I"`, `"Distribuído"`, `"Público"`, `"${item.queueName}"`, `"${d.toLocaleDateString('pt-BR')}"` ].join(";"));
+                });
+
+                const blob = new Blob(["\uFEFF" + rows.join("\n")], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Processos_Distribuidos_${startStr}_a_${endStr}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                console.log(`[AUDITORIA] Exportação CSV. Nível: ${currentUserLevel}. Período: ${startStr} a ${endStr}. Total: ${filtered.length}.`);
+                showToast(`${filtered.length} processos exportados!`, 'success');
+                closeModal('export-modal');
+            } catch (err) {
+                showToast(err.message, 'error');
+            } finally {
+                btn.innerHTML = `<i data-lucide="download" class="w-4 h-4"></i> Gerar CSV`;
+                btn.disabled = false;
+                lucide.createIcons({root: btn});
+            }
+        }
+
+        function toggleUserLevel() {
+            currentUserLevel = currentUserLevel === 'admin' ? 'assessor' : 'admin';
+            document.getElementById('user-level-text').innerText = currentUserLevel === 'admin' ? 'Nível Atual: Administrador' : 'Nível Atual: Usuário';
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = currentUserLevel === 'admin' ? '' : 'none');
+            renderSidebar(); // refresh permissions on sidebar
+            showToast(`Visão alterada para ${currentUserLevel}`, 'info');
+        }
+
+        function processDistribution(processNumber, queueId) {
+            let queue = queues.find(q => q.id === queueId);
+            let selectedAssessor = null;
+            
+            if(queue.vip && queue.vip.length > 0) {
+                selectedAssessor = assessors.find(a => a.id === queue.vip.shift());
+            } else {
+                let loops = 0;
+                while(loops < assessors.length * 2) {
+                    let a = assessors[queue.currentIndex];
+                    let eligible = true;
+                    if(!a.active) eligible = false;
+                    if(queueId === 'liminar' && a.skipLiminar) eligible = false;
+                    if(queueId === 'secao' && a.skipSecao) eligible = false;
+                    if(queueId === 'orgao' && a.skipOrgao) eligible = false;
+                    
+                    if(eligible && a.rule === '3/4') {
+                        let count = queue.cycleCounts[a.id] || 0;
+                        if(count >= 3) {
+                            eligible = false;
+                            queue.cycleCounts[a.id] = 0; 
+                            triggerNeonAlert(a.name); 
+                        } else {
+                            queue.cycleCounts[a.id] = count + 1;
+                        }
+                    }
+                    queue.currentIndex = (queue.currentIndex + 1) % assessors.length;
+                    if(eligible) { selectedAssessor = a; break; }
+                    loops++;
+                }
+            }
+            
+            if(!selectedAssessor) throw new Error("Nenhum assessor disponível.");
+            
+            distHistory.unshift({
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                processNumber,
+                queueId,
+                queueName: queue.name,
+                assessorId: selectedAssessor.id,
+                assessorName: selectedAssessor.fullName,
+                date: getBaseDateISO()
+            });
+        }
+
+        function executeSingleDistribution(e) {
+            e.preventDefault();
+            const processNum = document.getElementById('single-process').value.trim();
+            const queueId = document.getElementById('single-queue').value;
+            if(!processNum) return;
+            try {
+                processDistribution(processNum, queueId);
+                saveData(); renderAll();
+                document.getElementById('single-process').value = '';
+                showToast('Distribuído com sucesso!', 'success');
+            } catch(e) { showToast(e.message, 'error'); }
+        }
+
+        function handleImportCSV(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const workbook = XLSX.read(new Uint8Array(evt.target.result), {type: 'array'});
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: "A"});
+                    let ext = [];
+                    json.forEach(r => {
+                        if(r['C']) {
+                            const v = String(r['C']).trim();
+                            if(v.replace(/\D/g, '').length >= 10) ext.push(v);
+                        }
+                    });
+                    if(ext.length > 0) {
+                        document.getElementById('batch-processes').value = ext.join('\n');
+                        showToast(`${ext.length} extraídos da Coluna C!`, 'success');
+                    } else showToast('Nenhum processo válido.', 'warning');
+                } catch (err) { showToast('Erro na planilha.', 'error'); }
+                e.target.value = ''; 
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function handleBatchDistribute() {
+            let list = document.getElementById('batch-processes').value.split(/[\n,;]+/).map(p => p.trim()).filter(p => p);
+            if(list.length === 0) return showToast('Lista vazia.', 'warning');
+            const dups = list.filter(p => distHistory.some(h => h.processNumber === p));
+            if(dups.length > 0) {
+                pendingBatchList = list;
+                document.getElementById('duplicate-list').innerHTML = dups.map(d => `<li>${d}</li>`).join('');
+                document.getElementById('duplicate-modal').classList.remove('hidden');
+            } else executeBatchFinal(list, document.getElementById('batch-queue').value);
+        }
+
+        function confirmBatchNewOnly() {
+            closeModal('duplicate-modal');
+            const unique = pendingBatchList.filter(p => !distHistory.some(h => h.processNumber === p));
+            if(unique.length === 0) return showToast('Todos já constavam.', 'info');
+            executeBatchFinal(unique, document.getElementById('batch-queue').value);
+        }
+
+        function confirmBatchAll() {
+            closeModal('duplicate-modal');
+            executeBatchFinal(pendingBatchList, document.getElementById('batch-queue').value);
+        }
+
+        async function executeBatchFinal(list, queueId) {
+            if (currentUserLevel !== 'admin') {
+                return showToast('Permissão Negada: Apenas Administradores podem distribuir.', 'error');
+            }
+
+            const queue = queues.find(q => q.id === queueId);
+            const progressContainer = document.getElementById('batch-progress-container');
+            const progressBar = document.getElementById('batch-progress-bar');
+            const progressText = document.getElementById('batch-progress-text');
+            const btn = document.getElementById('btn-batch-distribute');
+
+            if(progressContainer) progressContainer.classList.remove('hidden');
+            if(btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin inline-block mr-2"></i> Processando...`;
+                lucide.createIcons({root: btn.parentElement});
+            }
+
+            let successCount = 0;
+            // Regra 9: Processamento em lotes menores (chunks) para não travar a tela
+            const chunkSize = 20; 
+
+            try {
+                for (let i = 0; i < list.length; i += chunkSize) {
+                    const chunk = list.slice(i, i + chunkSize);
+                    
+                    chunk.forEach(p => processDistribution(p, queueId));
+                    successCount += chunk.length;
+
+                    // Regra 6: Atualiza Barra de Progresso visualmente
+                    const percent = Math.round((successCount / list.length) * 100);
+                    if(progressBar) progressBar.style.width = `${percent}%`;
+                    if(progressText) progressText.innerText = `${percent}%`;
+
+                    // Espera uma fração de segundo para renderizar a animação
+                    await new Promise(resolve => setTimeout(resolve, 80));
+                }
+
+                saveData(); 
+                renderAll();
+                flashQueueCard(queueId); // Isolamento Visual: Pisca apenas a competência alvo
+                document.getElementById('batch-processes').value = '';
+                
+                // Feedback restrito indicando a competência alvo (Regras 1 e 6)
+                showToast(`${successCount} processos distribuídos EXCLUSIVAMENTE para: ${queue.name}`, 'success');
+
+            } catch(e) { 
+                showToast('Erro de Validação: ' + e.message, 'error'); 
+            } finally {
+                if(progressContainer) {
+                    setTimeout(() => progressContainer.classList.add('hidden'), 1000);
+                    progressBar.style.width = `0%`;
+                }
+                if(btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `Distribuir Lote`;
+                }
+            }
+        }
+
+        function toggleAssessor(id) {
+            if(currentUserLevel !== 'admin') return showToast('Apenas administradores.', 'warning');
+            assessors = assessors.map(a => a.id === id ? { ...a, active: !a.active } : a);
+            saveData(); renderAll();
+        }
+
+        function triggerNeonAlert(assessorName) {
+            const neon = document.getElementById('neon-34-alert');
+            if(neon) {
+                neon.innerHTML = `<i data-lucide="zap" class="w-4 h-4"></i> REGRA 3/4: ${assessorName} pulou a vez!`;
+                lucide.createIcons({root: neon});
+                neon.classList.remove('hidden');
+                neon.style.display = 'inline-flex';
+                setTimeout(() => { neon.style.display = 'none'; neon.classList.add('hidden'); }, 10000);
+            }
+        }
+
+        function renderSidebar() {
+            const list = document.getElementById('assessors-list');
+            list.innerHTML = assessors.map(a => `
+                <div class="bg-[#1e293b] rounded-lg border border-slate-700/50 p-4 flex flex-col gap-3 transition-opacity ${!a.active ? 'opacity-50' : ''}">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="user" class="w-4 h-4 text-slate-400"></i>
+                            <div>
+                                <div class="font-bold text-sm text-slate-200 cursor-pointer hover:text-blue-400 transition-colors" onclick="openAssessorModal('${a.id}')" title="Ver processos de ${a.name}">${a.prefix} - ${a.fullName}</div>
+                                <div class="text-[10px] text-slate-400 mt-0.5">${a.rule === '3/4' ? 'Regra especial: 3/4' : 'Normal'}${a.skipLiminar ? ' | Bloq.' : ''}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button onclick="toggleAssessor('${a.id}')" class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${a.active ? 'bg-emerald-500' : 'bg-slate-600'}" title="Ativar/Desativar Férias">
+                                <span class="inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${a.active ? 'translate-x-5' : 'translate-x-1'}"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            lucide.createIcons({root: list});
+        }
+
+        function calculateNextAssessorPreview(queueId) {
+            const queue = queues.find(q => q.id === queueId);
+            if(!queue) return null;
+            if (queue.vip && queue.vip.length > 0) {
+                const a = assessors.find(as => as.id === queue.vip[0]);
+                if (a) return { assessor: a, isVip: true };
+            }
+            let currentIndex = queue.currentIndex;
+            let loops = 0;
+            while(loops < assessors.length * 2) {
+                let a = assessors[currentIndex];
+                let eligible = true;
+                if(!a.active) eligible = false;
+                if(queueId === 'liminar' && a.skipLiminar) eligible = false;
+                if(queueId === 'secao' && a.skipSecao) eligible = false;
+                if(queueId === 'orgao' && a.skipOrgao) eligible = false;
+                if(eligible && a.rule === '3/4') {
+                    if((queue.cycleCounts[a.id] || 0) >= 3) eligible = false;
+                }
+                if(eligible) return { assessor: a, isVip: false };
+                currentIndex = (currentIndex + 1) % assessors.length;
+                loops++;
+            }
+            return null;
+        }
+
+        function renderNextInLine() {
+            document.getElementById('forecast-cards').innerHTML = queues.map(q => {
+                const next = calculateNextAssessorPreview(q.id);
+                return `
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 flex flex-col h-full hover:border-blue-300 transition-colors">
+                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3 leading-tight min-h-[30px]">${q.name}</span>
+                    <div class="mt-auto">
+                        ${next ? `
+                            <div class="flex items-center gap-2 mb-1 cursor-pointer hover:text-blue-500 transition-colors" onclick="openAssessorModal('${next.assessor.id}')" title="Ver processos de ${next.assessor.name}">
+                                <span class="text-2xl font-black text-blue-700 tracking-tight">${next.assessor.prefix} - ${next.assessor.id}</span>
+                                ${next.isVip ? '<span class="px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded shadow-sm">VIP</span>' : ''}
+                            </div>
+                            <div class="text-sm font-semibold text-slate-500 cursor-pointer hover:text-blue-500 transition-colors" onclick="openAssessorModal('${next.assessor.id}')">${next.assessor.name}</div>
+                        ` : `<div class="text-sm font-bold text-rose-500 bg-rose-50 p-2 rounded">Indisponível</div>`}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function timeAgo(dateString) {
+            const diff = Math.floor((new Date() - new Date(dateString)) / 1000);
+            if (diff < 60) return 'Agora mesmo';
+            if (diff < 3600) return `Há ${Math.floor(diff / 60)} min`;
+            if (diff < 86400) return `Há ${Math.floor(diff / 3600)} h`;
+            return `Há ${Math.floor(diff / 86400)} d`;
+        }
+
+        function populateDateFilters() {
+            const d = document.getElementById('filter-day'), y = document.getElementById('filter-year');
+            for(let i=1; i<=31; i++) d.innerHTML += `<option value="${i.toString().padStart(2,'0')}">${i}</option>`;
+            const curY = new Date().getFullYear();
+            for(let i=curY; i>=curY-3; i--) y.innerHTML += `<option value="${i}">${i}</option>`;
+        }
+
+        function clearFilters() {
+            ['filter-day','filter-month','filter-year','search-input'].forEach(id => document.getElementById(id).value = '');
+            applyFilters();
+        }
+        function applyFilters() { renderHistoryTable(); renderChart(); }
+
+        function filterByQueue(qId, btn) {
+            currentTabFilter = qId;
+            document.querySelectorAll('.hist-tab').forEach(b => b.className = "hist-tab px-4 py-1.5 text-xs font-bold rounded-md text-slate-600 hover:bg-slate-200 transition-colors");
+            btn.className = "hist-tab px-4 py-1.5 text-xs font-bold rounded-md bg-blue-100 text-blue-700 shadow-sm border border-blue-200";
+            applyFilters();
+        }
+
+        function getFilteredHistory() {
+            let data = currentTabFilter === 'all' ? distHistory : distHistory.filter(h => h.queueId === currentTabFilter);
+            const d = document.getElementById('filter-day').value, m = document.getElementById('filter-month').value, y = document.getElementById('filter-year').value;
+            const s = document.getElementById('search-input').value.toLowerCase().trim();
+            if (d||m||y) data = data.filter(h => {
+                const [hy, hm, hd] = h.date.split('T')[0].split('-');
+                return (!y || hy===y) && (!m || hm===m) && (!d || hd===d);
+            });
+            if (s) data = data.filter(h => h.processNumber.toLowerCase().includes(s) || h.assessorName.toLowerCase().includes(s));
+            return data;
+        }
+
+        function renderHistoryTable() {
+            const data = getFilteredHistory();
+            document.getElementById('total-count-badge').innerText = `TOTAL: ${data.length}`;
+            const tbody = document.getElementById('history-tbody');
+            if(data.length === 0) return tbody.innerHTML = `<tr><td colSpan="4" class="px-5 py-8 text-center text-slate-400">Nenhum processo encontrado.</td></tr>`;
+            
+            tbody.innerHTML = data.map(item => {
+                const d = new Date(item.date);
+                return `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-5 py-4 whitespace-nowrap text-xs">
+                        <span class="font-bold text-slate-700">${d.toLocaleDateString('pt-BR')}</span>
+                        <span class="text-slate-400 ml-1 block sm:inline">${d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}</span>
+                    </td>
+                    <td class="px-5 py-4">
+                        <div class="font-mono font-bold text-slate-900 flex items-center gap-2">
+                            ${item.processNumber}
+                            <button onclick="copyToClipboard('${item.processNumber}')" class="text-slate-400 hover:text-blue-500" title="Copiar"><i data-lucide="copy" class="w-3.5 h-3.5"></i></button>
+                            <a href="https://pjesg.tjpb.jus.br/pje2g/ng2/dev.seam#/painel-usuario-interno" target="_blank" class="text-slate-400 hover:text-blue-500" title="PJe"><i data-lucide="external-link" class="w-3.5 h-3.5"></i></a>
+                        </div>
+                        <span class="text-[10px] text-amber-600 font-bold mt-1 flex items-center gap-1"><i data-lucide="timer" class="w-3 h-3"></i> ${timeAgo(item.date)}</span>
+                    </td>
+                    <td class="px-5 py-4"><span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[11px] font-bold border border-slate-200">${item.queueName}</span></td>
+                    <td class="px-5 py-4 text-center">
+                        <div class="flex items-center justify-center gap-2">
+                            <span class="font-black text-blue-700 mr-2 cursor-pointer hover:underline" onclick="openAssessorModal('${item.assessorId}')" title="Ver processos de ${item.assessorName}">${item.assessorName}</span>
+                            <button onclick="openRectifyModal('${item.id}')" class="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded" title="Retificar Distribuição"><i data-lucide="arrow-left-right" class="w-4 h-4"></i></button>
+                            <button onclick="promptDelete('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded" title="Remover"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+            lucide.createIcons({root: tbody});
+        }
+
+        let reportChartInstance = null;
+        function renderChart() {
+            const ctx = document.getElementById('reportChart').getContext('2d');
+            if (reportChartInstance) reportChartInstance.destroy();
+            const filteredData = getFilteredHistory();
+            const total = filteredData.length || 1;
+            const counts = assessors.map(a => filteredData.filter(h => h.assessorId === a.id).length);
+            const colors = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#64748b', '#d946ef'];
+            
+            reportChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: assessors.map(a => a.prefix), datasets: [{ data: counts, backgroundColor: colors, borderRadius: 4 }] },
+                options: {
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                    layout: { padding: { right: 80, left: 0 } },
+                    onHover: (event, chartElement) => {
+                        event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
+                    },
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const assessor = assessors[index];
+                            if(assessor) openAssessorModal(assessor.id);
+                        }
+                    },
+                    plugins: { 
+                        legend: { display: false },
+                        datalabels: { 
+                            anchor: 'end', align: 'end', font: { weight: 'bold', size: 11 }, 
+                            formatter: (v, ctx) => v > 0 ? `${v} (${((v/total)*100).toFixed(1)}%)` : '' 
+                        }
+                    },
+                    scales: { 
+                        x: { display: false }, 
+                        y: { grid: { display: false }, ticks: { font: { weight: 'bold' }, autoSkip: false } } 
+                    }
+                }
+            });
+        }
+
+        function promptDelete(id) { pendingDeleteId = id; document.getElementById('vip-modal').classList.remove('hidden'); }
+        function confirmDelete(isVip) {
+            closeModal('vip-modal');
+            if(!pendingDeleteId) return;
+            const idx = distHistory.findIndex(h => h.id === pendingDeleteId);
+            if(idx > -1) {
+                const rec = distHistory[idx];
+                if(isVip) {
+                    queues.find(q => q.id === rec.queueId)?.vip.push(rec.assessorId);
+                    showToast(`${rec.assessorName} receberá compensação (VIP)!`, 'info');
+                } else showToast('Apagado.', 'success');
+                distHistory.splice(idx, 1);
+                saveData(); renderAll();
+            }
+            pendingDeleteId = null;
+        }
+
+        // --- LÓGICA DE RETIFICAÇÃO DE DISTRIBUIÇÃO ---
+        let pendingRectifyId = null;
+
+        function openRectifyModal(id) {
+            const record = distHistory.find(h => h.id === id);
+            if (!record) return;
+            
+            pendingRectifyId = id;
+            document.getElementById('rectify-process').innerText = record.processNumber;
+            document.getElementById('rectify-old-assessor').innerText = record.assessorName;
+
+            const select = document.getElementById('rectify-new-assessor');
+            // Popula os assessores disponíveis (exclui o que já tem o processo)
+            select.innerHTML = assessors
+                .filter(a => a.id !== record.assessorId && a.active)
+                .map(a => `<option value="${a.id}">${a.prefix} - ${a.name}</option>`)
+                .join('');
+
+            document.getElementById('rectify-modal').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function confirmRectify() {
+            const newAssessorId = document.getElementById('rectify-new-assessor').value;
+            if (!newAssessorId || !pendingRectifyId) return;
+
+            const recordIndex = distHistory.findIndex(h => h.id === pendingRectifyId);
+            if (recordIndex > -1) {
+                const record = distHistory[recordIndex];
+                const oldAssessorName = record.assessorName.split(' ')[0];
+                const newAssessor = assessors.find(a => a.id === newAssessorId);
+
+                // 1. Gera a compensação (Fila VIP) para o assessor que perdeu
+                const queue = queues.find(q => q.id === record.queueId);
+                if (queue) {
+                    if (!queue.vip) queue.vip = [];
+                    queue.vip.push(record.assessorId);
+                }
+
+                // 2. Altera o dono do processo
+                record.assessorId = newAssessor.id;
+                record.assessorName = newAssessor.fullName;
+
+                saveData(); 
+                renderAll();
+                showToast(`Processo redistribuído para ${newAssessor.name}. ${oldAssessorName} compensado(a)!`, 'success');
+            }
+
+            closeModal('rectify-modal');
+            pendingRectifyId = null;
+        }
+        // ---------------------------------------------
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => showToast('Copiado!','success')).catch(()=>showToast('Erro','error'));
+        }
+
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function openResetModal() { document.getElementById('reset-modal').classList.remove('hidden'); }
+
+        function confirmResetAction() {
+            assessors = JSON.parse(JSON.stringify(initialAssessors));
+            queues = JSON.parse(JSON.stringify(initialQueues));
+            distHistory = [];
+            clearFilters(); saveData(true); renderAll();
+            closeModal('reset-modal');
+            showToast('Histórico zerado com sucesso.', 'success');
+        }
+
+        function renderAll() { renderSidebar(); renderNextInLine(); renderHistoryTable(); renderChart(); }
+
+        // === NOVAS FUNÇÕES DO MODAL (ISOLAMENTO DE COMPETÊNCIA) ===
+        let currentModalState = { type: null, id: null }; 
+
+        function openAssessorModal(assessorId) {
+            currentModalState = { type: 'assessor', id: assessorId };
+            const assessor = assessors.find(a => a.id === assessorId);
+            if (!assessor) return;
+            openGenericModal(`<i data-lucide="folder-open" class="text-blue-600"></i> Processos de ${assessor.name}`);
+        }
+
+        function openQueueModal(queueId) {
+            currentModalState = { type: 'queue', id: queueId };
+            const queue = queues.find(q => q.id === queueId);
+            if (!queue) return;
+            openGenericModal(`<i data-lucide="layers" class="text-emerald-600"></i> Processos da Fila: ${queue.name}`);
+        }
+
+        function openGenericModal(titleHTML) {
+            const now = new Date();
+            document.getElementById('modal-assessor-title').innerHTML = titleHTML;
+            lucide.createIcons({root: document.getElementById('modal-assessor-title')});
+            document.getElementById('modal-last-updated').innerText = `Última atualização: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR')}`;
+            
+            const modal = document.getElementById('assessor-details-modal');
+            const content = document.getElementById('assessor-modal-content');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.add('modal-enter');
+                content.classList.add('modal-enter-content');
+            }, 10);
+
+            document.getElementById('modal-loading').classList.remove('hidden');
+            document.getElementById('modal-search').value = '';
+            document.getElementById('modal-filter-status').value = 'all';
+
+            setTimeout(() => {
+                renderModalTable();
+                document.getElementById('modal-loading').classList.add('hidden');
+            }, 300);
+        }
+
+        function closeAssessorModal() {
+            const modal = document.getElementById('assessor-details-modal');
+            const content = document.getElementById('assessor-modal-content');
+            modal.classList.remove('modal-enter');
+            content.classList.remove('modal-enter-content');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                currentModalState = { type: null, id: null };
+            }, 200); 
+        }
+
+        function handleModalBackdropClick(event) {
+            if (event.target.id === 'assessor-details-modal') {
+                closeAssessorModal();
+            }
+        }
+
+        function renderModalTable() {
+            if (!currentModalState.id) return;
+            
+            const searchVal = document.getElementById('modal-search').value.toLowerCase().trim();
+            const statusVal = document.getElementById('modal-filter-status').value;
+            const baseDateStr = document.getElementById('base-date').value || new Date().toISOString().split('T')[0];
+            const clearedDates = JSON.parse(localStorage.getItem('gab24_cleared_dates') || '[]');
+            const isCleared = clearedDates.includes(baseDateStr);
+
+            // REGRA FUNDAMENTAL: ISOLAMENTO TOTAL (FILTRO ESTRITO)
+            let filteredHistory = [];
+            if (currentModalState.type === 'assessor') {
+                // Filtro 1: Apenas os processos vinculados a este assessor
+                filteredHistory = distHistory.filter(h => h.assessorId === currentModalState.id);
+            } else if (currentModalState.type === 'queue') {
+                // Filtro 2 (Solução do Bug): Apenas os processos vinculados a esta competência específica
+                filteredHistory = distHistory.filter(h => h.queueId === currentModalState.id);
+            }
+            
+            const total = filteredHistory.length;
+            const pendentesHoje = isCleared ? 0 : filteredHistory.filter(h => h.date.startsWith(baseDateStr)).length;
+            const emAndamentoAntigos = total - pendentesHoje;
+            
+            document.getElementById('modal-assessor-subtitle').innerText = `Total: ${total} processos (Filtro Estrito Ativo)`;
+            document.getElementById('modal-metric-total').innerText = total;
+            document.getElementById('modal-metric-pending').innerText = pendentesHoje;
+            document.getElementById('modal-metric-progress').innerText = emAndamentoAntigos;
+
+            if (searchVal) {
+                filteredHistory = filteredHistory.filter(h => h.processNumber.toLowerCase().includes(searchVal));
+            }
+            if (statusVal !== 'all') {
+                filteredHistory = filteredHistory.filter(h => {
+                    const isToday = h.date.startsWith(baseDateStr) && !isCleared;
+                    if (statusVal === 'Pendente') return isToday;
+                    if (statusVal === 'Em Andamento') return !isToday;
+                    return true;
+                });
+            }
+
+            const tbody = document.getElementById('modal-tbody');
+            if(filteredHistory.length === 0) {
+                tbody.innerHTML = `<tr><td colSpan="6" class="px-5 py-12 text-center text-slate-500"><i data-lucide="inbox" class="w-12 h-12 mx-auto mb-3 text-slate-300"></i> Nenhum processo encontrado nesta visão.</td></tr>`;
+                lucide.createIcons({root: tbody});
+                return;
+            }
+            
+            const mockClasses = ["Apelação Cível", "Agravo de Instrumento", "Mandado de Segurança", "Habeas Corpus", "Embargos de Declaração"];
+            const mockAssuntos = ["Direito Civil", "Direito Tributário", "Direito do Consumidor", "Direito Público", "Obrigações"];
+
+            tbody.innerHTML = filteredHistory.map((item) => {
+                const d = new Date(item.date);
+                const isToday = item.date.startsWith(baseDateStr) && !isCleared;
+                
+                const statusColor = isToday ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-blue-600 bg-blue-50 border-blue-200';
+                const statusIcon = isToday ? 'circle-dot' : 'activity';
+                const statusText = isToday ? 'Pendente' : 'Em Andamento';
+                
+                const rIndex = parseInt(item.processNumber.replace(/\D/g, '').slice(-2) || '0', 10);
+                const classe = mockClasses[rIndex % mockClasses.length];
+                const assunto = mockAssuntos[(rIndex + 1) % mockAssuntos.length];
+                const isSecret = (rIndex % 5 === 0); 
+                
+                return `
+                <tr class="hover:bg-blue-50/50 transition-colors group">
+                    <td class="px-5 py-4">
+                        <div class="font-mono font-bold text-slate-900 flex items-center gap-1.5">
+                            ${isSecret ? '<i data-lucide="lock" class="w-3.5 h-3.5 text-rose-500" title="Segredo de Justiça"></i>' : ''}
+                            ${item.processNumber}
+                        </div>
+                    </td>
+                    <td class="px-5 py-4 text-[11px] font-semibold text-slate-600">
+                        ${d.toLocaleDateString('pt-BR')} ${d.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
+                    </td>
+                    <td class="px-5 py-4">
+                        <div class="font-bold text-slate-700 text-xs">${classe}</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5 truncate max-w-[120px]" title="${assunto}">${assunto}</div>
+                    </td>
+                    <td class="px-5 py-4">
+                        <span class="inline-block bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-bold border border-slate-200 truncate max-w-[150px]" title="${item.queueName}">
+                            ${item.queueName}
+                        </span>
+                        ${currentModalState.type === 'queue' ? `<div class="text-[9px] text-blue-600 mt-1 font-bold">👤 ${item.assessorName.split('(')[0]}</div>` : ''}
+                    </td>
+                    <td class="px-5 py-4">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${statusColor}">
+                            <i data-lucide="${statusIcon}" class="w-3 h-3"></i> ${statusText}
+                        </span>
+                    </td>
+                    <td class="px-5 py-4 text-center">
+                        <div class="flex items-center justify-center gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="copyToClipboard('${item.processNumber}')" class="p-1.5 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300 rounded shadow-sm transition-all" title="Copiar Número">
+                                <i data-lucide="copy" class="w-4 h-4"></i>
+                            </button>
+                            <a href="https://pjesg.tjpb.jus.br/pje2g/ng2/dev.seam#/painel-usuario-interno" target="_blank" class="p-1.5 bg-blue-600 border border-blue-700 text-white hover:bg-blue-700 rounded shadow-sm transition-all" title="Abrir no PJe">
+                                <i data-lucide="external-link" class="w-4 h-4"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+            
+            lucide.createIcons({root: tbody});
+        }
+    </script>
+</body>
+</html>
